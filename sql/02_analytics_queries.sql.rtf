@@ -1,0 +1,74 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2907
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 -- =========================================================================\
+-- INSURANCE PORTFOLIO ANALYTICS: ADVANCED QUERIES\
+-- Description: Core analytical queries evaluating loss ratios, claim pipeline \
+-- efficiency, credit risk segmentation, and cumulative window functions.\
+-- =========================================================================\
+\
+-- 1. Loss Ratio Analysis by Policy Type\
+-- Measures total claims paid vs. total premiums collected to determine underwriting health.\
+SELECT \
+    p.policy_type,\
+    COUNT(DISTINCT p.policy_id) AS total_policies,\
+    SUM(p.monthly_premium) AS total_premium_collected,\
+    SUM(COALESCE(c.payout_amount, 0)) AS total_claims_paid,\
+    ROUND(\
+        (SUM(COALESCE(c.payout_amount, 0)) / NULLIF(SUM(p.monthly_premium), 0)) * 100, \
+        2\
+    ) AS loss_ratio_percentage\
+FROM policies p\
+LEFT JOIN claims c ON p.policy_id = c.policy_id\
+GROUP BY p.policy_type\
+ORDER BY loss_ratio_percentage DESC;\
+\
+\
+-- 2. Claim Status & Payout Breakdown\
+-- Evaluates operational volume and financial exposure across claim pipeline stages.\
+SELECT \
+    c.claim_status,\
+    COUNT(c.claim_id) AS total_claims,\
+    SUM(c.claim_amount) AS total_claimed_amount,\
+    SUM(c.payout_amount) AS total_payout_amount,\
+    ROUND(AVG(c.payout_amount), 2) AS average_payout\
+FROM claims c\
+GROUP BY c.claim_status\
+ORDER BY total_claims DESC;\
+\
+\
+-- 3. Client Risk Segmentation by Credit Score Tiers\
+-- Correlates client credit health with claim frequency and average payouts.\
+SELECT \
+    CASE \
+        WHEN cl.credit_score >= 750 THEN 'Low Risk (750+)'\
+        WHEN cl.credit_score BETWEEN 650 AND 749 THEN 'Medium Risk (650-749)'\
+        ELSE 'High Risk (<650)'\
+    END AS risk_tier,\
+    COUNT(DISTINCT cl.client_id) AS client_count,\
+    COUNT(c.claim_id) AS total_claims_filed,\
+    ROUND(AVG(c.payout_amount), 2) AS avg_claim_payout\
+FROM clients cl\
+JOIN policies p ON cl.client_id = p.client_id\
+LEFT JOIN claims c ON p.policy_id = c.policy_id\
+GROUP BY risk_tier\
+ORDER BY avg_claim_payout DESC;\
+\
+\
+-- 4. Window Function: Cumulative Running Total of Premiums\
+-- Demonstrates advanced window functions for cumulative financial reporting partitioned by product line.\
+SELECT \
+    p.start_date,\
+    p.policy_type,\
+    p.monthly_premium,\
+    SUM(p.monthly_premium) OVER (\
+        PARTITION BY p.policy_type \
+        ORDER BY p.start_date \
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\
+    ) AS cumulative_premium_by_type\
+FROM policies p\
+ORDER BY p.policy_type, p.start_date;}
